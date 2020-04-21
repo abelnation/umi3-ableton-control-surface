@@ -45,6 +45,12 @@ from .consts import *
 from .util import color_to_bytes
 from .util import midi_bytes_to_values
 
+STATE_OFF = 0.0
+STATE_ON = 1.0
+
+LOOPER_DEVICE_CLASS = 'Looper'
+LOOPER_STATE_PARAM_NAME = 'Device On'
+
 #
 # Logidy UMI3 Internal Implementation Constants
 #
@@ -104,13 +110,13 @@ class UMI3(ControlSurface):
 
 	def _build_components(self):
 		# UMI3 Buttons
-		self._button_umi3_1 = APCUtils.make_pedal_button(UMI3_1)
+		self._button_umi3_1 = APCUtils.make_button(UMI3_CHANNEL, UMI3_1)
 		self._button_umi3_1.add_value_listener(self.debug_button_handler)
 
-		self._button_umi3_2 = APCUtils.make_pedal_button(UMI3_2)
+		self._button_umi3_2 = APCUtils.make_button(UMI3_CHANNEL, UMI3_2)
 		self._button_umi3_2.add_value_listener(self.debug_button_handler)
 
-		self._button_umi3_3 = APCUtils.make_pedal_button(UMI3_3)
+		self._button_umi3_3 = APCUtils.make_button(UMI3_CHANNEL, UMI3_3)
 		self._button_umi3_3.add_value_listener(self.debug_button_handler)
 
 		self._all_buttons = [self._button_umi3_1, self._button_umi3_2, self._button_umi3_3]
@@ -125,26 +131,37 @@ class UMI3(ControlSurface):
 
 	def selected_track_changed(self):
 		self.log_message('selected_track_changed()')
-		self.request_rebuild_midi_map()
+		self.map_looper_controls_for_current_track()
 
 	def map_looper_controls_for_current_track(self):
 		self.log_message('map_looper_controls_for_current_track()')
+		# self._toggle_loopers_for_selected_track()
+		self._map_buttons_to_channel_for_selected_track()
 
-		# 1. Unmap existing loopers
+	def _map_buttons_to_channel_for_selected_track(self):
+		selected_track_num = self.selected_track_num
+		new_channel_num = selected_track_num + 1
+		self.log_message('Mapping buttons to channel %s' % new_channel_num)
+
+		with self.component_guard():
+			for button in self._all_buttons:
+				button.use_default_message()
+				button.set_channel(new_channel_num)
+
+		self.request_rebuild_midi_map()
+
+	def _toggle_loopers_for_selected_track(self):
+		# 1. Disable existing loopers
 		for track in self.song().tracks:
 			for device in [d for d in track.devices if d.class_name == 'Looper']:
 				param = [p for p in device.parameters if p.name == 'Device On'][0]
-				param.value = 0.0
-				# self.schedule_message(1, lambda: param.value = 1.0)
-				# device.is_active = False
+				param.value = STATE_OFF
 
 		# Map loopers for current track
 		selected_track = self.selected_track
 		for device in [d for d in selected_track.devices if d.class_name == 'Looper']:
 			param = [p for p in device.parameters if p.name == 'Device On'][0]
-			param.value = 1.0
-			# self.schedule_message(1, lambda: param.value = 1.0)
-			# device.is_active = True
+			param.value = STATE_ON
 
 	#
 	# Refresh handling
@@ -161,18 +178,22 @@ class UMI3(ControlSurface):
 		self.retries_count = 0
 		self.device_connected = False
 
-	def update_display(self):
-		super(UMI3, self).update_display()
+		self.map_looper_controls_for_current_track()
 
 	#
 	# Connection Management
 	#
 
+	def update(self):
+		super(UMI3, self).update()
+		self.log_message('update()')
+
 	def build_midi_map(self, midi_map_handle):
 		super(UMI3, self).build_midi_map(midi_map_handle)
+		self.log_message('build_midi_map()')
 
 		# map mixer controls to currently selected track
-		self.map_looper_controls_for_current_track()
+		# self.map_looper_controls_for_current_track()
 
 	def suggest_input_port(self):
 		return "UMI3 Midi Device"

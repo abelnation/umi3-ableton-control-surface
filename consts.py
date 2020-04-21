@@ -29,13 +29,10 @@ BUTTON_OFF = 0
 NUM_TRACKS = 13
 NUM_SCENES = 10
 NUM_RETURN_TRACKS = 2
-NUM_MODES = 4
-
-CHANNEL = 0
 
 # UMI3 CC's
 # Configured via the UMI3 configuration pedal ahead of time
 UMI3_CHANNEL = 0
-UMI3_1 = 100
-UMI3_2 = 101
-UMI3_3 = 102
+UMI3_1 = 60
+UMI3_2 = 61
+UMI3_3 = 62
