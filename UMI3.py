@@ -80,17 +80,54 @@ class UMI3(ControlSurface):
 
 		self.show_message("Version: " + VERSION)
 
-		self._tasks.add(Task.sequence(
-			Task.wait(1.0),
-			Task.run(self._test_callback),
-			Task.wait(1.0),
-			Task.run(self._test_callback),
-			Task.wait(1.0),
-			Task.run(self._test_callback),
-		))
+	#
+	# Connected Components
+	#
 
-	def _test_callback(self):
-		self.log_message('test callback (time: %s)' % time.time())
+	def _build_components(self):
+		# UMI3 Buttons
+		# self._button_umi3_1 = APCUtils.make_button(UMI3_CHANNEL, UMI3_1)
+		# self._button_umi3_1.add_value_listener(self.debug_button_handler)
+		# self._button_umi3_1.add_value_listener(self._loop_button_pressed)
+		self._button_umi3_1 = MultiButton(
+			wrapped_control=APCUtils.make_button(UMI3_CHANNEL, UMI3_1),
+		)
+
+		self._button_umi3_1.single_press.add_value_listener(self._loop_button_pressed)
+		self._button_umi3_1.long_press.add_value_listener(self._replace_current_clip_with_new_loop)
+		self._button_umi3_1.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
+
+		# self._button_umi3_1.any_press.add_value_listener(partial(self.debug_multi_button, 'any_press'))
+		# self._button_umi3_1.single_press.add_value_listener(partial(self.debug_multi_button, 'single_press'))
+		# self._button_umi3_1.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
+		# self._button_umi3_1.long_press.add_value_listener(partial(self.debug_multi_button, 'long_press'))
+
+		# self._button_umi3_2 = APCUtils.make_button(UMI3_CHANNEL, UMI3_2)
+		# self._button_umi3_2.add_value_listener(self.debug_button_handler)
+		self._button_umi3_2 = MultiButton(
+			wrapped_control=APCUtils.make_button(UMI3_CHANNEL, UMI3_2),
+		)
+		self._button_umi3_2.any_press.add_value_listener(partial(self.debug_multi_button, 'any_press'))
+		self._button_umi3_2.single_press.add_value_listener(partial(self.debug_multi_button, 'single_press'))
+		self._button_umi3_2.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
+		self._button_umi3_2.long_press.add_value_listener(partial(self.debug_multi_button, 'long_press'))
+
+		# self._button_umi3_3 = None
+		# self._button_umi3_3 = APCUtils.make_button(UMI3_CHANNEL, UMI3_3)
+		# self._button_umi3_3.add_value_listener(self.debug_button_handler)
+		#
+		self._button_umi3_3 = MultiButton(
+			wrapped_control=APCUtils.make_button(UMI3_CHANNEL, UMI3_3),
+		)
+		# self._button_umi3_3.any_press.add_value_listener(partial(self.debug_multi_button, 'any_press'))
+		# self._button_umi3_3.single_press.add_value_listener(partial(self.debug_multi_button, 'single_press'))
+		# self._button_umi3_3.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
+
+		self._all_buttons = [self._button_umi3_1, self._button_umi3_2, self._button_umi3_3]
+
+		self.map_looper_controls_for_current_track()
+
+		self.song().view.add_selected_track_listener(self.selected_track_changed)
 
 	#
 	# Ableton Helpers
@@ -129,61 +166,10 @@ class UMI3(ControlSurface):
 			device for device in self.selected_track.devices
 			if device.class_name == class_name
 		]
+
 	#
-	# Connected Components
+	# Button behavior
 	#
-
-	def _build_components(self):
-		# UMI3 Buttons
-		self._button_umi3_1 = APCUtils.make_button(UMI3_CHANNEL, UMI3_1)
-		self._button_umi3_1.add_value_listener(self.debug_button_handler)
-		self._button_umi3_1.add_value_listener(self._loop_button_pressed)
-
-		self._button_umi3_2 = APCUtils.make_button(UMI3_CHANNEL, UMI3_2)
-		self._button_umi3_2.add_value_listener(self.debug_button_handler)
-
-		self._button_umi3_3 = None
-		# self._button_umi3_3 = APCUtils.make_button(UMI3_CHANNEL, UMI3_3)
-		self._button_umi3_3 = MultiButton(
-			wrapped_control=APCUtils.make_button(UMI3_CHANNEL, UMI3_3),
-		)
-		self._button_umi3_3.single_press.add_value_listener(partial(self.debug_multi_button, 'single_press'))
-		self._button_umi3_3.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
-		self._button_umi3_3.long_press.add_value_listener(partial(self.debug_multi_button, 'long_press'))
-		# self._button_umi3_3.add_value_listener(self.debug_button_handler)
-
-		self._all_buttons = [self._button_umi3_1, self._button_umi3_2, self._button_umi3_3]
-
-		self.map_looper_controls_for_current_track()
-
-		self.song().view.add_selected_track_listener(self.selected_track_changed)
-
-	def debug_multi_button(self, name, value):
-		self.log_message('debug_multi_button - %s(%s) (time: %s)' % (name, value, time.time()))
-	#
-	# Mixer Control Mapping
-	#
-
-	def selected_track_changed(self):
-		self.log_message('selected_track_changed()')
-		self.map_looper_controls_for_current_track()
-
-	def map_looper_controls_for_current_track(self):
-		self.log_message('map_looper_controls_for_current_track()')
-		# self._toggle_loopers_for_selected_track()
-		# self._map_buttons_to_channel_for_selected_track()
-
-	def _map_buttons_to_channel_for_selected_track(self):
-		selected_track_num = self.selected_track_num
-		new_channel_num = selected_track_num + 1
-		self.log_message('Mapping buttons to channel %s' % new_channel_num)
-
-		with self.component_guard():
-			for button in self._all_buttons:
-				button.use_default_message()
-				button.set_channel(new_channel_num)
-
-		self.request_rebuild_midi_map()
 
 	def _next_available_clip_slot(self, track):
 		for clip_slot in track.clip_slots:
@@ -192,7 +178,7 @@ class UMI3(ControlSurface):
 		return None
 
 	def _loop_button_pressed(self, value):
-		if value != BUTTON_ON:
+		if value == BUTTON_OFF:
 			return
 
 		self.log_message('_loop_button_pressed()')
@@ -216,18 +202,14 @@ class UMI3(ControlSurface):
 		clip_slot = self._next_available_clip_slot(self.selected_track)
 		clip_slot.fire()
 
-	def _toggle_loopers_for_selected_track(self):
-		# 1. Disable existing loopers
-		for track in self.song().tracks:
-			for device in [d for d in track.devices if d.class_name == 'Looper']:
-				param = [p for p in device.parameters if p.name == 'Device On'][0]
-				param.value = STATE_OFF
+	def _replace_current_clip_with_new_loop(self, *args):
+		self.log_message('_replace_current_clip_with_new_loop()')
+		if self.selected_track.playing_slot_index >= 0:
+			# Will be -1 when no clip is playing.
+			playing_clip_slot = self.selected_track.clip_slots[self.selected_track.playing_slot_index]
 
-		# Map loopers for current track
-		selected_track = self.selected_track
-		for device in [d for d in selected_track.devices if d.class_name == 'Looper']:
-			param = [p for p in device.parameters if p.name == 'Device On'][0]
-			param.value = STATE_ON
+			playing_clip_slot.delete_clip()
+			playing_clip_slot.fire()
 
 	#
 	# Refresh handling
@@ -272,11 +254,8 @@ class UMI3(ControlSurface):
 		self.log_message('Param update: %s(%s)' % (param.name, param.value))
 		self.log_message('    value_items: %s' % (list(param.value_items), ))
 
-	def debug_button_handler(self, value, *args, **kwargs):
-		self.log_message('button: %s' % value)
-
-	def debug_note_handler(self, value, *args, **kwargs):
-		self.log_message('note: %s' % value)
+	def debug_multi_button(self, name, value):
+		self.log_message('debug_multi_button - %s(%s) (time: %s)' % (name, value, time.time()))
 
 	def handle_nonsysex(self, midi_bytes):
 		super(UMI3, self).handle_nonsysex(midi_bytes)
@@ -284,3 +263,44 @@ class UMI3(ControlSurface):
 		if not is_pitchbend:
 			self.log_message('midi ch:%s value:%s(%s)' % (channel, identifier, value))
 
+	#
+	# Archived methods below...
+	#
+
+	def _toggle_loopers_for_selected_track(self):
+		# 1. Disable existing loopers
+		for track in self.song().tracks:
+			for device in [d for d in track.devices if d.class_name == 'Looper']:
+				param = [p for p in device.parameters if p.name == 'Device On'][0]
+				param.value = STATE_OFF
+
+		# Map loopers for current track
+		selected_track = self.selected_track
+		for device in [d for d in selected_track.devices if d.class_name == 'Looper']:
+			param = [p for p in device.parameters if p.name == 'Device On'][0]
+			param.value = STATE_ON
+
+	#
+	# Mixer Control Mapping
+	#
+
+	def selected_track_changed(self):
+		self.log_message('selected_track_changed()')
+		self.map_looper_controls_for_current_track()
+
+	def map_looper_controls_for_current_track(self):
+		self.log_message('map_looper_controls_for_current_track()')
+		# self._toggle_loopers_for_selected_track()
+		# self._map_buttons_to_channel_for_selected_track()
+
+	def _map_buttons_to_channel_for_selected_track(self):
+		selected_track_num = self.selected_track_num
+		new_channel_num = selected_track_num + 1
+		self.log_message('Mapping buttons to channel %s' % new_channel_num)
+
+		with self.component_guard():
+			for button in self._all_buttons:
+				button.use_default_message()
+				button.set_channel(new_channel_num)
+
+		self.request_rebuild_midi_map()
