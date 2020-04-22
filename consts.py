@@ -34,5 +34,5 @@ NUM_RETURN_TRACKS = 2
 # Configured via the UMI3 configuration pedal ahead of time
 UMI3_CHANNEL = 0
 UMI3_1 = 60
-UMI3_2 = 61
-UMI3_3 = 62
+UMI3_2 = 62
+UMI3_3 = 64

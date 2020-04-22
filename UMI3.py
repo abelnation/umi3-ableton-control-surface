@@ -34,6 +34,8 @@ from _Framework.MixerComponent import MixerComponent
 from _Framework.SessionComponent import SessionComponent
 from _Framework.TransportComponent import TransportComponent
 
+from _Framework import Task
+
 # Provides many constants
 from _Framework.InputControlElement import *
 
@@ -42,6 +44,7 @@ from _APC import ControlElementUtils as APCUtils
 from _APC.DetailViewCntrlComponent import DetailViewCntrlComponent
 
 from .consts import *
+from .MultiButton import MultiButton
 from .util import color_to_bytes
 from .util import midi_bytes_to_values
 
@@ -56,16 +59,38 @@ LOOPER_STATE_PARAM_NAME = 'Device On'
 #
 
 class UMI3(ControlSurface):
+
+	"""
+	Configures the UMI3 to be a custom loop clip controller
+	for the currently active track.
+
+	There are three main states:
+	1) No clip active
+	2) Actively playing a loop (not recording)
+	3) Actively recording a loop
+	"""
+
 	def __init__(self, *args, **kwargs):
 		ControlSurface.__init__(self, *args, **kwargs)
 
-		self.log_message('__init__()')
+		self.log_message('__init__() (time: %s)' % time.time())
 
 		with self.component_guard():
 			self._build_components()
 
 		self.show_message("Version: " + VERSION)
 
+		self._tasks.add(Task.sequence(
+			Task.wait(1.0),
+			Task.run(self._test_callback),
+			Task.wait(1.0),
+			Task.run(self._test_callback),
+			Task.wait(1.0),
+			Task.run(self._test_callback),
+		))
+
+	def _test_callback(self):
+		self.log_message('test callback (time: %s)' % time.time())
 
 	#
 	# Ableton Helpers
@@ -112,12 +137,20 @@ class UMI3(ControlSurface):
 		# UMI3 Buttons
 		self._button_umi3_1 = APCUtils.make_button(UMI3_CHANNEL, UMI3_1)
 		self._button_umi3_1.add_value_listener(self.debug_button_handler)
+		self._button_umi3_1.add_value_listener(self._loop_button_pressed)
 
 		self._button_umi3_2 = APCUtils.make_button(UMI3_CHANNEL, UMI3_2)
 		self._button_umi3_2.add_value_listener(self.debug_button_handler)
 
-		self._button_umi3_3 = APCUtils.make_button(UMI3_CHANNEL, UMI3_3)
-		self._button_umi3_3.add_value_listener(self.debug_button_handler)
+		self._button_umi3_3 = None
+		# self._button_umi3_3 = APCUtils.make_button(UMI3_CHANNEL, UMI3_3)
+		self._button_umi3_3 = MultiButton(
+			wrapped_control=APCUtils.make_button(UMI3_CHANNEL, UMI3_3),
+		)
+		self._button_umi3_3.single_press.add_value_listener(partial(self.debug_multi_button, 'single_press'))
+		self._button_umi3_3.double_press.add_value_listener(partial(self.debug_multi_button, 'double_press'))
+		self._button_umi3_3.long_press.add_value_listener(partial(self.debug_multi_button, 'long_press'))
+		# self._button_umi3_3.add_value_listener(self.debug_button_handler)
 
 		self._all_buttons = [self._button_umi3_1, self._button_umi3_2, self._button_umi3_3]
 
@@ -125,6 +158,8 @@ class UMI3(ControlSurface):
 
 		self.song().view.add_selected_track_listener(self.selected_track_changed)
 
+	def debug_multi_button(self, name, value):
+		self.log_message('debug_multi_button - %s(%s) (time: %s)' % (name, value, time.time()))
 	#
 	# Mixer Control Mapping
 	#
@@ -136,7 +171,7 @@ class UMI3(ControlSurface):
 	def map_looper_controls_for_current_track(self):
 		self.log_message('map_looper_controls_for_current_track()')
 		# self._toggle_loopers_for_selected_track()
-		self._map_buttons_to_channel_for_selected_track()
+		# self._map_buttons_to_channel_for_selected_track()
 
 	def _map_buttons_to_channel_for_selected_track(self):
 		selected_track_num = self.selected_track_num
@@ -149,6 +184,37 @@ class UMI3(ControlSurface):
 				button.set_channel(new_channel_num)
 
 		self.request_rebuild_midi_map()
+
+	def _next_available_clip_slot(self, track):
+		for clip_slot in track.clip_slots:
+			if not clip_slot.has_clip:
+				return clip_slot
+		return None
+
+	def _loop_button_pressed(self, value):
+		if value != BUTTON_ON:
+			return
+
+		self.log_message('_loop_button_pressed()')
+
+		# If actively recording a loop, stop recording and play the loop
+		if self.selected_track.playing_slot_index >= 0:
+			# Will be -1 when no clip is playing.
+			playing_clip_slot = self.selected_track.clip_slots[self.selected_track.playing_slot_index]
+
+			# If currently recording a loop, stop recording, and start playing
+			if playing_clip_slot.is_recording:
+				# Firing a recording clip will stop recording and
+				# start playing from the beginning
+				playing_clip_slot.fire()
+				return
+
+		# Not recording a loop, so start recording a new loop in the next available slot
+		if not self.selected_track.arm:
+			self.selected_track.arm	= True
+
+		clip_slot = self._next_available_clip_slot(self.selected_track)
+		clip_slot.fire()
 
 	def _toggle_loopers_for_selected_track(self):
 		# 1. Disable existing loopers
@@ -191,9 +257,6 @@ class UMI3(ControlSurface):
 	def build_midi_map(self, midi_map_handle):
 		super(UMI3, self).build_midi_map(midi_map_handle)
 		self.log_message('build_midi_map()')
-
-		# map mixer controls to currently selected track
-		# self.map_looper_controls_for_current_track()
 
 	def suggest_input_port(self):
 		return "UMI3 Midi Device"
